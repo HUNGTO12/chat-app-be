@@ -27,3 +27,20 @@ exports.searchUsers = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// Lấy danh sách tất cả users
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find(
+      {},
+      "_id uid email username displayName photoURL"
+    )
+      .limit(100)
+      .sort({ updatedAt: -1 });
+
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách users:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

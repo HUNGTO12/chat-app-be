@@ -165,13 +165,29 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ username }).select("+password");
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      // Tạo JWT token
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          username: user.username,
+        },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "7d" }
+      );
+
       // Loại bỏ password khỏi response
       const userResponse = { ...user._doc };
       delete userResponse.password;
 
       res.status(200).json({
         success: true,
-        data: userResponse,
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          displayName: user.displayName,
+        },
         message: "Đăng nhập thành công",
       });
     } else {
