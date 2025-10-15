@@ -3,47 +3,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 
-// Xử lý đăng nhập bằng firebase
-exports.login_firebase = async (req, res) => {
-  try {
-    // Lấy thông tin user từ request body
-    const { displayName, email, photoURL, uid, providerId } = req.body;
-
-    // Tìm user trong database theo uid
-    let user = await User.findOne({ uid });
-
-    if (!user) {
-      // Nếu user chưa tồn tại, tạo mới
-      user = new User({
-        displayName,
-        email,
-        photoURL,
-        uid,
-        providerId,
-      });
-      await user.save(); // Lưu vào database
-    } else {
-      // Nếu user đã tồn tại, cập nhật thông tin
-      user.displayName = displayName || user.displayName;
-      user.photoURL = photoURL || user.photoURL;
-      await user.save(); // Lưu thay đổi
-    }
-
-    // Trả về kết quả thành công
-    res.json({
-      success: true,
-      data: user,
-      message: "Đăng nhập thành công",
-    });
-  } catch (error) {
-    console.error("Lỗi xác thực:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
 // Xử lý đăng nhập bằng Facebook
 exports.loginWithFacebook = async (req, res) => {
   try {
@@ -81,26 +40,22 @@ exports.loginWithFacebook = async (req, res) => {
         });
       }
 
-      // Tìm user trong database theo Facebook ID hoặc Firebase UID
-      let user = await User.findOne({
-        $or: [{ facebookId: fbUser.id }, { uid: userID }],
-      });
+      // Tìm user trong database theo Facebook ID
+      let user = await User.findOne({ providerUid: fbUser.id });
 
       if (!user) {
         // Nếu user chưa tồn tại, tạo mới
         user = new User({
-          facebookId: fbUser.id,
+          providerUid: fbUser.id,
           displayName: fbUser.name || name,
           email: fbUser.email || email,
           photoURL: fbUser.picture?.data?.url,
           providerId: "facebook.com",
-          uid: userID, // Firebase UID
         });
         await user.save();
         console.log("Created new user:", user._id);
       } else {
         // Cập nhật thông tin nếu có thay đổi
-        user.facebookId = fbUser.id; // Đảm bảo facebookId được cập nhật
         user.displayName = fbUser.name || user.displayName;
         user.email = fbUser.email || user.email;
         user.photoURL = fbUser.picture?.data?.url || user.photoURL;
@@ -112,7 +67,7 @@ exports.loginWithFacebook = async (req, res) => {
       const token = jwt.sign(
         {
           userId: user._id,
-          facebookId: user.facebookId,
+          providerUid: user.providerUid,
         },
         process.env.JWT_SECRET || "your-secret-key",
         { expiresIn: "7d" }
@@ -163,8 +118,8 @@ exports.login = async (req, res) => {
   try {
     // Tìm user theo username (cần select password để so sánh)
     const user = await User.findOne({ username }).select("+password");
-
-    if (user && (await bcrypt.compare(password, user.password))) {
+    const hashPass = await bcrypt.compare(password, user.password);
+    if (user && hashPass) {
       // Tạo JWT token
       const token = jwt.sign(
         {

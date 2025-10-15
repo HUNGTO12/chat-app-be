@@ -4,18 +4,6 @@ const authController = require("../controllers/authController");
 // Tạo router cho authentication
 const router = express.Router();
 
-// Đăng nhập bằng firebase
-router.post("/login_firebase", authController.login_firebase);
-
-// Route test
-router.get("/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "Auth API hoạt động bình thường",
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Đăng nhập bằng Facebook
 router.post("/facebook", authController.loginWithFacebook);
 
