@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 // Cấu hình các Middleware
 app.use(
   cors({
-    origin: "*", // URL của frontend
+    origin: ["http://localhost:5173", "https://chat-app-fe-three.vercel.app"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"], // Các phương thức được phép
     allowedHeaders: ["Content-Type", "Authorization"], // Các header được phép
   })
