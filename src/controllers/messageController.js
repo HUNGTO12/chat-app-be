@@ -174,6 +174,20 @@ exports.createMessage = async (req, res) => {
     room.updatedAt = new Date();
     await room.save();
 
+    // Emit Socket.IO event để gửi tin nhắn real-time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(roomId).emit("receive-message", {
+        id: message._id,
+        text: message.text,
+        displayName: message.displayName,
+        photoURL: message.photoURL,
+        createdAt: message.createdAt,
+        uid: message.uid,
+        roomId: message.roomId,
+      });
+    }
+
     res.status(201).json({
       success: true,
       data: message,
