@@ -174,10 +174,10 @@ exports.createMessage = async (req, res) => {
     room.updatedAt = new Date();
     await room.save();
 
-    // Emit Socket.IO event để gửi tin nhắn real-time
+    // Emit Socket.IO event để gửi tin nhắn real-time đến TẤT CẢ users trong room
     const io = req.app.get("io");
     if (io) {
-      io.to(roomId).emit("receive-message", {
+      const messageData = {
         id: message._id,
         text: message.text,
         displayName: message.displayName,
@@ -185,7 +185,10 @@ exports.createMessage = async (req, res) => {
         createdAt: message.createdAt,
         uid: message.uid,
         roomId: message.roomId,
-      });
+      };
+      // Emit đến TẤT CẢ users trong room (bao gồm cả người gửi)
+      io.to(roomId).emit("receive-message", messageData);
+      console.log("📤 Emitted message to room:", roomId);
     }
 
     res.status(201).json({
