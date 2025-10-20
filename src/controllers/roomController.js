@@ -113,12 +113,10 @@ exports.createRoom = async (req, res) => {
     const { name, description, createdBy } = req.body;
 
     if (!name || !createdBy) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Tên phòng và người tạo là bắt buộc",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Tên phòng và người tạo là bắt buộc",
+      });
     }
 
     const user = await findUser(createdBy);
@@ -159,12 +157,10 @@ exports.joinRoom = async (req, res) => {
     const { userId, email, username, uid } = req.body;
 
     if (!userId && !email && !username && !uid) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Cần cung cấp userId hoặc email hoặc username hoặc uid",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Cần cung cấp userId hoặc email hoặc username hoặc uid",
+      });
     }
 
     const user =
@@ -190,16 +186,34 @@ exports.joinRoom = async (req, res) => {
     const userIdString = user._id.toString();
 
     if (room.members.includes(userIdString)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Người dùng đã là thành viên của phòng này",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Người dùng đã là thành viên của phòng này",
+      });
     }
 
     room.members.push(userIdString);
     await room.save();
+
+    // ===== THÊM: Emit socket event để thông báo user được mời vào phòng =====
+    const io = req.app.get("io");
+    if (io) {
+      const roomData = {
+        _id: room._id,
+        name: room.name,
+        description: room.description,
+        createdBy: room.createdBy,
+      };
+
+      console.log(
+        `🔔 Emitting room-invitation to user ${userIdString}:`,
+        roomData
+      );
+      io.emit("room-invitation", {
+        userId: userIdString,
+        room: roomData,
+      });
+    }
 
     res.json({
       success: true,
@@ -261,12 +275,10 @@ exports.kickMember = async (req, res) => {
     }
 
     if (room.createdBy !== userId) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Chỉ chủ phòng mới có quyền kick thành viên",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Chỉ chủ phòng mới có quyền kick thành viên",
+      });
     }
 
     if (userId === memberId) {
@@ -276,12 +288,10 @@ exports.kickMember = async (req, res) => {
     }
 
     if (!room.members.includes(memberId)) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Thành viên không có trong phòng này",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Thành viên không có trong phòng này",
+      });
     }
 
     room.members = room.members.filter((member) => member !== memberId);
@@ -314,12 +324,10 @@ exports.deleteRoom = async (req, res) => {
     }
 
     if (room.createdBy !== userId) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Chỉ người tạo phòng mới có quyền xóa phòng này",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Chỉ người tạo phòng mới có quyền xóa phòng này",
+      });
     }
 
     await Room.findByIdAndDelete(roomId);
