@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
-
+const cloudinary = require("../config/cloudinary");
+const { Readable } = require("stream");
 // Tìm kiếm user theo query q (email | username | displayName - không phân biệt hoa thường)
 exports.searchUsers = async (req, res) => {
   try {
@@ -68,5 +69,65 @@ exports.updateUser = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Upload ảnh đại diện
+exports.uploadAvatar = async (req, res) => {
+  try {
+    // Kiểm tra có file không
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Không có file được upload",
+      });
+    }
+
+    // Cấu hình upload lên Cloudinary
+    const uploadOptions = {
+      folder: "chat-app",
+      resource_type: "image",
+      transformation: [
+        { width: 500, height: 500, crop: "limit" }, // Giới hạn kích thước
+        { quality: "auto" }, // Tự động tối ưu chất lượng
+      ],
+    };
+
+    // Xử lý callback sau khi upload
+    const handleUploadComplete = (error, result) => {
+      if (error) {
+        console.error("Lỗi upload Cloudinary:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Lỗi khi upload ảnh lên Cloudinary",
+          error: error.message,
+        });
+      }
+
+      // Trả về URL của ảnh
+      return res.json({
+        success: true,
+        data: { photoURL: result.secure_url },
+        message: "Upload ảnh thành công",
+      });
+    };
+
+    // Tạo upload stream
+    const uploadStream = cloudinary.uploader.upload_stream(
+      uploadOptions,
+      handleUploadComplete
+    );
+
+    // Chuyển buffer thành stream và upload
+    const bufferStream = new Readable();
+    bufferStream.push(req.file.buffer);
+    bufferStream.push(null); // Đánh dấu kết thúc stream
+    bufferStream.pipe(uploadStream);
+  } catch (error) {
+    console.error("Lỗi upload ảnh:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
