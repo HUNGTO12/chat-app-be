@@ -16,8 +16,6 @@ const PORT = process.env.PORT || 5000;
 // Danh sách origins được phép
 const allowedOrigins = ["*"].filter(Boolean); // Loại bỏ undefined
 
-console.log("🔐 Allowed CORS Origins:", allowedOrigins);
-
 // Thiết lập Socket.IO
 setupSocketIO(server, app, allowedOrigins);
 

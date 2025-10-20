@@ -56,7 +56,6 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     });
   });
 
-  console.log("🔌 Socket.IO initialized");
   return io;
 }
 
