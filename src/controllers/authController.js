@@ -56,9 +56,12 @@ exports.loginWithFacebook = async (req, res) => {
         console.log("Created new user:", user._id);
       } else {
         // Cập nhật thông tin nếu có thay đổi
+        // Chỉ cập nhật displayName và email, GIỮ NGUYÊN photoURL đã có trong database
+        // để không ghi đè ảnh đã upload bởi user
         user.displayName = fbUser.name || user.displayName;
         user.email = fbUser.email || user.email;
-        user.photoURL = fbUser.picture?.data?.url || user.photoURL;
+        // KHÔNG cập nhật photoURL nếu user đã có ảnh trong database
+        // user.photoURL sẽ giữ nguyên ảnh đã upload
         await user.save();
         console.log("Updated existing user:", user._id);
       }
