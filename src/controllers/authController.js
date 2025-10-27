@@ -121,39 +121,51 @@ exports.login = async (req, res) => {
   try {
     // Tìm user theo username (cần select password để so sánh)
     const user = await User.findOne({ username }).select("+password");
-    const hashPass = await bcrypt.compare(password, user.password);
-    if (user && hashPass) {
-      // Tạo JWT token
-      const token = jwt.sign(
-        {
-          userId: user._id,
-          username: user.username,
-        },
-        process.env.JWT_SECRET || "your-secret-key",
-        { expiresIn: "7d" }
-      );
-
-      // Loại bỏ password khỏi response
-      const userResponse = { ...user._doc };
-      delete userResponse.password;
-
-      res.status(200).json({
-        success: true,
-        token,
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          displayName: user.displayName,
-        },
-        message: "Đăng nhập thành công",
-      });
-    } else {
-      res.status(401).json({
+    if (!user) {
+      return res.status(401).json({
         success: false,
         message: "Sai tên đăng nhập hoặc mật khẩu",
       });
     }
+
+    const hashPass = await bcrypt.compare(password, user.password);
+    if (!hashPass) {
+      return res.status(401).json({
+        success: false,
+        message: "Sai tên đăng nhập hoặc mật khẩu",
+      });
+    }
+
+    // Tạo access token (1 giờ)
+    const accessToken = jwt.sign(
+      {
+        userId: user._id,
+        username: user.username,
+      },
+      process.env.JWT_SECRET || "your-secret-key",
+      { expiresIn: "1h" }
+    );
+
+    // Tạo refresh token (7 ngày)
+    const refreshToken = jwt.sign(
+      {
+        userId: user._id,
+        username: user.username,
+      },
+      process.env.JWT_SECRET || "your-secret-key",
+      { expiresIn: "7d" }
+    );
+
+    // Cập nhật refresh token và access token vào user
+    user.refreshToken = [refreshToken];
+    user.accessToken = accessToken;
+    await user.save();
+
+    console.log("Login successfully");
+    res.status(200).json({
+      accessToken,
+      refreshToken,
+    });
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
     res.status(500).json({
@@ -275,6 +287,89 @@ exports.register = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+// Xử lý refresh token
+exports.refreshToken = async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({
+      success: false,
+      message: "Refresh token là bắt buộc",
+    });
+  }
+
+  try {
+    // Kiểm tra refresh token có trong database không
+    const user = await User.findOne({ refreshToken: { $in: [refreshToken] } });
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: "Refresh token không hợp lệ",
+      });
+    }
+
+    // Tạo access token mới
+    const newAccessToken = jwt.sign(
+      {
+        userId: user._id,
+        username: user.username,
+      },
+      process.env.JWT_SECRET || "your-secret-key",
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      accessToken: newAccessToken,
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+// Xử lý logout
+exports.logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token là bắt buộc",
+      });
+    }
+
+    // Tìm người dùng với refresh token
+    const user = await User.findOne({ refreshToken: refreshToken });
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: "Refresh token không hợp lệ",
+      });
+    }
+
+    // Xóa refresh token khỏi database
+    user.refreshToken = user.refreshToken.filter(
+      (token) => token !== refreshToken
+    );
+    user.accessToken = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Đăng xuất thành công",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 };

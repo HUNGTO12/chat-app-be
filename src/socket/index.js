@@ -21,8 +21,6 @@ function setupSocketIO(server, app, allowedOrigins = []) {
   }
 
   io.on("connection", (socket) => {
-    console.log(`✅ Socket connected: ${socket.id}`);
-
     // Client phải emit 'join-room' sau khi connect
     socket.on("join-room", (roomId) => {
       if (!roomId) return;
@@ -35,10 +33,6 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       if (!message || !message.roomId) return;
       // Emit tới tất cả thành viên trong phòng (bao gồm cả người gửi)
       io.to(String(message.roomId)).emit("receive-message", message);
-      console.log(
-        `📨 Real-time message sent to room ${message.roomId}:`,
-        message
-      );
     });
 
     socket.on("leave-room", (roomId) => {

@@ -13,6 +13,12 @@ router.post("/login", authController.login);
 // Đăng ký username + password
 router.post("/register", authController.register);
 
+// Refresh token
+router.post("/refresh-token", authController.refreshToken);
+
+// Logout
+router.post("/logout", authController.logout);
+
 // Route test để kiểm tra authentication
 const { authenticateToken } = require("../middleware/auth.middleware");
 router.get("/profile", authenticateToken, (req, res) => {

@@ -32,6 +32,16 @@ const userSchema = new mongoose.Schema(
       unique: true, // Không được trùng lặp
     },
     isActive: { type: Boolean, default: true }, // Trạng thái hoạt động của người dùng
+    accessToken: [
+      {
+        type: String,
+      },
+    ], // Lưu access tokens
+    refreshToken: [
+      {
+        type: String,
+      },
+    ], // Lưu refresh tokens
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt
