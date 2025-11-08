@@ -65,7 +65,31 @@ exports.updateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ message: "Profile updated successfully" });
+
+    // Emit socket event để thông báo user đã cập nhật profile
+    const io = req.app.get("io");
+    if (io) {
+      // Broadcast đến TẤT CẢ clients (trừ chính user này nếu muốn)
+      io.emit("user-profile-updated", {
+        userId: user._id.toString(),
+        providerUid: user.providerUid,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        email: user.email,
+      });
+      console.log("📢 Broadcasted user profile update:", user._id);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        _id: user._id,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        email: user.email,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });

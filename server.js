@@ -4,6 +4,7 @@ const http = require("http"); // HTTP server
 const connectDB = require("./src/config/db"); // Hàm kết nối tới MongoDB
 const Router = require("./src/routers/index"); // Import các routes API
 const setupSocketIO = require("./src/socket/index"); // Hàm thiết lập Socket.IO
+const setupCORS = require("./src/middleware/setupcors.middleware"); // Hàm thiết lập CORS và body parsers
 require("dotenv").config(); // Load các biến môi trường từ file .env
 
 // Khởi tạo ứng dụng Express
@@ -19,33 +20,8 @@ const allowedOrigins = ["*"].filter(Boolean); // Loại bỏ undefined
 // Thiết lập Socket.IO
 setupSocketIO(server, app, allowedOrigins);
 
-// Cấu hình các Middleware
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Cho phép requests không có origin
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes("*")) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.warn(`⚠️ CORS blocked origin: ${origin}`);
-        callback(null, true); // Tạm thời cho phép, sau đó đổi thành callback(new Error('Not allowed by CORS'))
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
-// Middleware để parse JSON data từ request body, giới hạn 10MB
-app.use(express.json({ limit: "10mb" }));
-// Middleware để parse URL-encoded data từ form, giới hạn 10MB
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// Thiết lập CORS và body parsers
+setupCORS(app, allowedOrigins);
 
 // Kết nối tới MongoDB
 connectDB();

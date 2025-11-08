@@ -8,13 +8,6 @@ exports.loginWithFacebook = async (req, res) => {
   try {
     const { accessToken, userID, email, name } = req.body;
 
-    console.log("Facebook login request:", {
-      accessToken: accessToken?.substring(0, 20) + "...",
-      userID,
-      email,
-      name,
-    });
-
     if (!accessToken || !userID) {
       return res.status(400).json({
         success: false,
@@ -143,7 +136,7 @@ exports.login = async (req, res) => {
         username: user.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "1h" }
+      { expiresIn: "10m" }
     );
 
     // Tạo refresh token (7 ngày)
@@ -355,10 +348,14 @@ exports.logout = async (req, res) => {
     }
 
     // Xóa refresh token khỏi database
-    user.refreshToken = user.refreshToken.filter(
-      (token) => token !== refreshToken
-    );
-    user.accessToken = null;
+    if (Array.isArray(user.refreshToken)) {
+      user.refreshToken = user.refreshToken.filter(
+        (token) => token !== refreshToken
+      );
+    } else {
+      user.refreshToken = null;
+    }
+
     await user.save();
 
     res.status(200).json({

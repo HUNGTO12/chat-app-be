@@ -22,17 +22,36 @@ exports.getMessages = async (req, res) => {
 
     // Lấy tin nhắn của phòng
     const messages = await Message.find({ roomId })
+      .populate({ path: "userId", select: "providerUid displayName photoURL" })
       .sort({ createdAt: 1 }) // Sắp xếp từ cũ tới mới
       .skip(skip) // Bỏ qua số tin nhắn đã hiển thị ở trang trước
       .limit(parseInt(limit)) // Giới hạn số tin nhắn trả về
       .select("-__v"); // Loại bỏ field __v
+
+    // Map tin nhắn với thông tin user đã populate
+    const messagesWithUserInfo = messages.map((message) => {
+      const messageObj = message.toObject();
+      const user = messageObj.userId;
+
+      return {
+        _id: messageObj._id,
+        text: messageObj.text,
+        roomId: messageObj.roomId,
+        userId: user?._id,
+        displayName: user?.displayName || "Unknown User",
+        photoURL: user?.photoURL || "",
+        providerUid: user?.providerUid || user?._id?.toString(),
+        createdAt: messageObj.createdAt,
+        updatedAt: messageObj.updatedAt,
+      };
+    });
 
     // Đếm tổng số tin nhắn
     const totalMessages = await Message.countDocuments({ roomId });
 
     res.json({
       success: true,
-      data: messages,
+      data: messagesWithUserInfo,
       pagination: {
         currentPage: parseInt(page), // Trang hiện tại
         totalPages: Math.ceil(totalMessages / limit), // Tổng số trang
@@ -66,27 +85,31 @@ exports.getRecentMessages = async (req, res) => {
 
     // Lấy tin nhắn mới nhất
     const messages = await Message.find({ roomId })
+      .populate({
+        path: "userId",
+        select: "displayName photoURL providerUid",
+      })
       .sort({ createdAt: -1 }) // Sắp xếp từ mới tới cũ
       .limit(parseInt(limit)) // Giới hạn số lượng
       .select("-__v"); // Loại bỏ field __v
 
-    // Populate thông tin user cho mỗi tin nhắn
-    const messagesWithUserInfo = await Promise.all(
-      messages.map(async (message) => {
-        // Tìm user theo uid hoặc _id
-        let user = await User.findOne({ uid: message.uid });
-        if (!user) {
-          // Nếu không tìm thấy theo uid, thử tìm theo _id
-          user = await User.findById(message.uid);
-        }
-        return {
-          ...message.toObject(),
-          // Sử dụng thông tin từ DB nếu có, không thì dùng thông tin trong message
-          displayName: user?.displayName || message.displayName,
-          photoURL: user?.photoURL || message.photoURL,
-        };
-      })
-    );
+    // Map tin nhắn với thông tin user đã populate
+    const messagesWithUserInfo = messages.map((message) => {
+      const messageObj = message.toObject();
+      const user = messageObj.userId;
+
+      return {
+        _id: messageObj._id,
+        text: messageObj.text,
+        roomId: messageObj.roomId,
+        userId: user?._id,
+        displayName: user?.displayName || "Unknown User",
+        photoURL: user?.photoURL || "",
+        providerUid: user?.providerUid || user?._id?.toString(),
+        createdAt: messageObj.createdAt,
+        updatedAt: messageObj.updatedAt,
+      };
+    });
 
     // Đảo ngược để hiển thị từ cũ tới mới
     messagesWithUserInfo.reverse();
@@ -108,10 +131,10 @@ exports.getRecentMessages = async (req, res) => {
 // Tạo tin nhắn mới
 exports.createMessage = async (req, res) => {
   try {
-    const { text, roomId, uid, displayName, photoURL } = req.body; // Lấy dữ liệu từ request body
+    const { text, roomId, providerUid, displayName, photoURL } = req.body; // Lấy dữ liệu từ request body
 
     // Kiểm tra các trường bắt buộc
-    if (!text || !roomId || !uid) {
+    if (!text || !roomId || !providerUid) {
       return res.status(400).json({
         success: false,
         message: "Nội dung tin nhắn, ID phòng và UID người dùng là bắt buộc",
@@ -127,25 +150,36 @@ exports.createMessage = async (req, res) => {
       });
     }
 
-    // Tìm user theo uid hoặc _id
-    let user = await User.findOne({ uid });
+    // Tìm user theo _id hoặc providerUid
+    // providerUid có thể là MongoDB _id hoặc Firebase UID
+    let user = await User.findById(providerUid);
     if (!user) {
-      // Nếu không tìm thấy theo uid, thử tìm theo _id
-      user = await User.findById(uid);
+      // Nếu không tìm thấy theo _id, thử tìm theo providerUid
+      user = await User.findOne({ providerUid: providerUid });
     }
     if (!user) {
+      console.log("❌ User not found with providerUid:", providerUid);
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy người dùng",
       });
     }
 
+    console.log("✅ Found user:", user._id, user.displayName);
+
     // Kiểm tra xem user có phải thành viên của phòng không (kiểm tra cả _id và uid)
     const userIdString = user._id.toString();
+    console.log("🔍 Checking membership:");
+    console.log("  - User ID:", userIdString);
+    console.log("  - Room members:", room.members);
+    console.log("  - Provider UID:", providerUid);
+
     const isUserMember =
       room.members.includes(userIdString) ||
-      room.members.includes(uid) ||
-      (user.uid && room.members.includes(user.uid));
+      room.members.includes(providerUid) ||
+      (user.providerUid && room.members.includes(user.providerUid));
+
+    console.log("  - Is member?", isUserMember);
 
     if (!isUserMember) {
       return res.status(403).json({
@@ -154,18 +188,11 @@ exports.createMessage = async (req, res) => {
       });
     }
 
-    // Lấy thông tin user (đã fetch ở trên)
-    const userDisplayName = displayName || user.displayName;
-    const userPhotoURL = photoURL || user.photoURL;
-
-    // Tạo tin nhắn mới
+    // Tạo tin nhắn mới - CHỈ lưu text, roomId và userId
     const message = new Message({
       text,
       roomId,
-      userId: user._id, // Thêm userId (ObjectId) - required field
-      uid: user.uid || user._id.toString(), // Sử dụng uid của Firebase hoặc _id của user thường
-      displayName: userDisplayName,
-      photoURL: userPhotoURL,
+      userId: user._id, // Chỉ lưu userId để reference
     });
 
     await message.save(); // Lưu tin nhắn vào database
@@ -176,24 +203,43 @@ exports.createMessage = async (req, res) => {
 
     // Emit Socket.IO event để gửi tin nhắn real-time đến TẤT CẢ users trong room
     const io = req.app.get("io");
+    console.log("🔍 IO instance exists?", !!io);
+
     if (io) {
       const messageData = {
-        id: message._id,
+        id: message._id.toString(),
         text: message.text,
-        displayName: message.displayName,
-        photoURL: message.photoURL,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
         createdAt: message.createdAt,
-        uid: message.uid,
-        roomId: message.roomId,
+        providerUid: user.providerUid || user._id.toString(),
+        roomId: message.roomId.toString(),
       };
+
+      console.log("📤 Emitting to room:", String(roomId));
+      console.log("📤 Message data:", JSON.stringify(messageData, null, 2));
+
       // Emit đến TẤT CẢ users trong room (bao gồm cả người gửi)
-      io.to(roomId).emit("receive-message", messageData);
-      console.log("📤 Emitted message to room:", roomId);
+      io.to(String(roomId)).emit("receive-message", messageData);
+
+      console.log("✅ Message emitted successfully");
+    } else {
+      console.error("❌ Socket.IO instance not found, message not broadcasted");
     }
 
     res.status(201).json({
       success: true,
-      data: message,
+      data: {
+        _id: message._id.toString(),
+        text: message.text,
+        roomId: message.roomId.toString(),
+        userId: message.userId.toString(),
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        providerUid: user.providerUid || user._id.toString(),
+        createdAt: message.createdAt,
+        updatedAt: message.updatedAt,
+      },
       message: "Tạo tin nhắn thành công",
     });
   } catch (error) {

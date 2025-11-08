@@ -1,6 +1,6 @@
 const express = require("express");
 const authController = require("../controllers/authController");
-
+const { authenticateToken } = require("../middleware/auth.middleware");
 // Tạo router cho authentication
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.post("/refresh-token", authController.refreshToken);
 router.post("/logout", authController.logout);
 
 // Route test để kiểm tra authentication
-const { authenticateToken } = require("../middleware/auth.middleware");
+
 router.get("/profile", authenticateToken, (req, res) => {
   res.json({
     success: true,

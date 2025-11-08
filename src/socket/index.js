@@ -21,6 +21,8 @@ function setupSocketIO(server, app, allowedOrigins = []) {
   }
 
   io.on("connection", (socket) => {
+    console.log(`✅ Socket connected: ${socket.id}`);
+
     // Client phải emit 'join-room' sau khi connect
     socket.on("join-room", (roomId) => {
       if (!roomId) return;
@@ -28,11 +30,14 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       console.log(`📍 Socket ${socket.id} joined room ${roomId}`);
       socket.emit("joined-room", { roomId, socketId: socket.id });
     });
-    // Thêm đoạn này để xử lý gửi tin nhắn real-time
+
+    // KHÔNG CẦN xử lý 'send-message' từ client nữa
+    // Vì backend controller sẽ emit 'receive-message' sau khi lưu DB
+    // Giữ lại để backward compatibility, nhưng sẽ không sử dụng
     socket.on("send-message", (message) => {
-      if (!message || !message.roomId) return;
-      // Emit tới tất cả thành viên trong phòng (bao gồm cả người gửi)
-      io.to(String(message.roomId)).emit("receive-message", message);
+      console.log(
+        "⚠️ Deprecated: Client should not emit 'send-message'. Backend will handle it."
+      );
     });
 
     socket.on("leave-room", (roomId) => {

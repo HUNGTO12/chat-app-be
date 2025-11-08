@@ -17,12 +17,6 @@ const messageSchema = new mongoose.Schema(
       type: String, // Nội dung tin nhắn
       required: true, // Bắt buộc
     },
-    uid: {
-      type: String, // UID của người gửi tin nhắn
-      required: true, // Bắt buộc
-    },
-    displayName: String, // Tên hiển thị của người gửi (không bắt buộc)
-    photoURL: String, // URL ảnh đại diện của người gửi (không bắt buộc)
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt
