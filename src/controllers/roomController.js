@@ -299,6 +299,15 @@ exports.kickMember = async (req, res) => {
 
     const membersDetails = await getMembersDetails(room.members);
 
+    // ===== THÊM: Emit socket event để thông báo thành viên bị kick =====
+    const io = req.app.get("io");
+    if (io) {
+      io.to(room._id.toString()).emit("member:kicked", {
+        roomId: room._id.toString(),
+        memberId,
+      });
+    }
+
     res.json({
       success: true,
       data: { ...room.toObject(), membersDetails },
@@ -314,7 +323,7 @@ exports.kickMember = async (req, res) => {
 exports.deleteRoom = async (req, res) => {
   try {
     const { roomId } = req.params;
-    const { userId } = req.body;
+    const { userId } = req.body; // ID của người yêu cầu xóa phòng
 
     const room = await Room.findById(roomId);
     if (!room) {
@@ -322,14 +331,23 @@ exports.deleteRoom = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Không tìm thấy phòng chat" });
     }
-
+    // ✅ KIỂM TRA: So sánh userId với createdBy của phòng
     if (room.createdBy !== userId) {
       return res.status(403).json({
         success: false,
         message: "Chỉ người tạo phòng mới có quyền xóa phòng này",
       });
     }
-
+    // ✅ Emit socket event TRƯỚC KHI xóa để thông báo cho tất cả members
+    const io = req.app.get("io");
+    if (io) {
+      io.to(roomId).emit("room:deleted", {
+        roomId: roomId,
+        roomName: room.name,
+      });
+      console.log(`🗑️ Room deleted event emitted for room: ${roomId}`);
+    }
+    // ✅ Nếu là chủ phòng, cho phép xóa
     await Room.findByIdAndDelete(roomId);
 
     res.json({ success: true, message: "Xóa phòng thành công" });

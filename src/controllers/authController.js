@@ -136,7 +136,7 @@ exports.login = async (req, res) => {
         username: user.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "10m" }
+      { expiresIn: "1d" }
     );
 
     // Tạo refresh token (7 ngày)

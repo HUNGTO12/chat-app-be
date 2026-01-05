@@ -22,5 +22,8 @@ router.post("/:roomId/join", roomController.joinRoom);
 // POST /api/rooms/:roomId/kick - Kick thành viên khỏi phòng (chỉ chủ phòng)
 router.post("/:roomId/kick", roomController.kickMember);
 
+// DELETE /api/rooms/:roomId - Xóa phòng chat (chỉ chủ phòng)
+router.delete("/:roomId", roomController.deleteRoom);
+
 // Export router để sử dụng trong server.js
 module.exports = router;
