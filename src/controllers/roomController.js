@@ -244,6 +244,14 @@ exports.leaveRoom = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Không tìm thấy phòng chat" });
     }
+    // ✅ Emit socket event TRƯỚC KHI rời phòng để thông báo cho tất cả members
+    const io = req.app.get("io");
+    if (io) {
+      io.to(roomId).emit("member:leave", {
+        roomId: roomId,
+        userId: userId,
+      });
+    }
 
     room.members = room.members.filter((member) => member !== userId);
     await room.save();
