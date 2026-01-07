@@ -40,7 +40,6 @@ exports.getMessages = async (req, res) => {
         userId: user?._id,
         displayName: user?.displayName || "Unknown User",
         photoURL: user?.photoURL || "",
-        providerUid: user?.providerUid || user?._id?.toString(),
         createdAt: messageObj.createdAt,
         updatedAt: messageObj.updatedAt,
       };
@@ -105,7 +104,6 @@ exports.getRecentMessages = async (req, res) => {
         userId: user?._id,
         displayName: user?.displayName || "Unknown User",
         photoURL: user?.photoURL || "",
-        providerUid: user?.providerUid || user?._id?.toString(),
         createdAt: messageObj.createdAt,
         updatedAt: messageObj.updatedAt,
       };
@@ -351,16 +349,34 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
+    // Tìm user để so sánh ownership
+    let user = await User.findOne({ uid });
+    if (!user) {
+      user = await User.findById(uid);
+    }
+
     // Chỉ tác giả tin nhắn mới được xóa
-    if (message.uid !== uid) {
+    if (message.userId.toString() !== user?._id?.toString()) {
       return res.status(403).json({
         success: false,
         message: "Chỉ tác giả tin nhắn mới có quyền xóa",
       });
     }
 
+    const roomId = message.roomId.toString();
+
     // Xóa tin nhắn khỏi database
     await Message.findByIdAndDelete(messageId);
+
+    // ✅ Emit socket event để thông báo tin nhắn đã bị xóa
+    const io = req.app.get("io");
+    if (io) {
+      io.to(roomId).emit("message:deleted", {
+        messageId: messageId.toString(),
+        roomId,
+      });
+      console.log(`🗑️ Message deleted event emitted for message: ${messageId}`);
+    }
 
     res.json({
       success: true,

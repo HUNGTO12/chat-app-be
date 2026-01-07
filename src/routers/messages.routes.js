@@ -10,5 +10,8 @@ router.get("/room/:roomId/recent", messageController.getRecentMessages);
 // POST /api/messages - Tạo tin nhắn mới
 router.post("/", messageController.createMessage);
 
+// DELETE /api/messages/:messageId - Xóa tin nhắn
+router.delete("/:messageId", messageController.deleteMessage);
+
 // Export router để sử dụng trong server.js
 module.exports = router;

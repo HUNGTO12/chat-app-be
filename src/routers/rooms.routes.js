@@ -25,5 +25,8 @@ router.post("/:roomId/kick", roomController.kickMember);
 // DELETE /api/rooms/:roomId - Xóa phòng chat (chỉ chủ phòng)
 router.delete("/:roomId", roomController.deleteRoom);
 
+// Rời khỏi phòng chat
+router.post("/:roomId/leave", roomController.leaveRoom);
+
 // Export router để sử dụng trong server.js
 module.exports = router;
