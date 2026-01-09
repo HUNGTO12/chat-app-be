@@ -336,27 +336,63 @@ exports.updateMessage = async (req, res) => {
 // Xóa tin nhắn
 exports.deleteMessage = async (req, res) => {
   try {
-    const { messageId } = req.params; // Lấy messageId từ URL
-    const { uid } = req.body; // Lấy uid từ request body
+    const { messageId } = req.params;
+    const { uid } = req.body;
+
+    console.log("🗑️ Delete message request:", { messageId, uid });
 
     // Tìm tin nhắn theo ID
     const message = await Message.findById(messageId);
 
     if (!message) {
+      console.log("❌ Message not found:", messageId);
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy tin nhắn",
       });
     }
 
-    // Tìm user để so sánh ownership
-    let user = await User.findOne({ uid });
+    console.log("🔍 Message found:", {
+      messageId,
+      messageUserId: message.userId,
+      requestUid: uid,
+    });
+
+    // ✅ Tìm user theo nhiều cách
+    let user = await User.findOne({
+      $or: [{ uid: uid }, { _id: uid }, { providerUid: uid }],
+    });
+
     if (!user) {
-      user = await User.findById(uid);
+      console.log("❌ User not found with uid:", uid);
+      return res.status(403).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
     }
 
-    // Chỉ tác giả tin nhắn mới được xóa
-    if (message.userId.toString() !== user?._id?.toString()) {
+    console.log("👤 User found:", {
+      userId: user._id,
+      uid: user.uid,
+      providerUid: user.providerUid,
+    });
+
+    // ✅ So sánh với nhiều identifier
+    const isOwner =
+      message.userId.toString() === user._id.toString() ||
+      (user.uid && message.userId.toString() === user.uid) ||
+      (user.providerUid && message.userId.toString() === user.providerUid);
+
+    console.log("🔐 Ownership check:", {
+      isOwner,
+      messageUserId: message.userId.toString(),
+      userMongoId: user._id.toString(),
+      userUid: user.uid,
+      userProviderUid: user.providerUid,
+    });
+
+    if (!isOwner) {
+      console.log("❌ Permission denied");
       return res.status(403).json({
         success: false,
         message: "Chỉ tác giả tin nhắn mới có quyền xóa",
@@ -367,15 +403,19 @@ exports.deleteMessage = async (req, res) => {
 
     // Xóa tin nhắn khỏi database
     await Message.findByIdAndDelete(messageId);
+    console.log("✅ Message deleted from database:", messageId);
 
-    // ✅ Emit socket event để thông báo tin nhắn đã bị xóa
+    // Emit socket event
     const io = req.app.get("io");
     if (io) {
+      console.log("📡 Emitting message:deleted event");
       io.to(roomId).emit("message:deleted", {
         messageId: messageId.toString(),
         roomId,
       });
-      console.log(`🗑️ Message deleted event emitted for message: ${messageId}`);
+      console.log(`✅ Message deleted event emitted`);
+    } else {
+      console.error("❌ IO instance not found!");
     }
 
     res.json({
@@ -383,7 +423,7 @@ exports.deleteMessage = async (req, res) => {
       message: "Xóa tin nhắn thành công",
     });
   } catch (error) {
-    console.error("Lỗi khi xóa tin nhắn:", error);
+    console.error("❌ Lỗi khi xóa tin nhắn:", error);
     res.status(500).json({
       success: false,
       error: error.message,
