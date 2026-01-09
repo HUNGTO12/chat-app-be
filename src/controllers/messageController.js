@@ -38,7 +38,6 @@ exports.getMessages = async (req, res) => {
         text: messageObj.text,
         roomId: messageObj.roomId,
         userId: user?._id,
-        providerUid: user?.providerUid || user?._id,
         displayName: user?.displayName || "Unknown User",
         photoURL: user?.photoURL || "",
         createdAt: messageObj.createdAt,
@@ -103,7 +102,6 @@ exports.getRecentMessages = async (req, res) => {
         text: messageObj.text,
         roomId: messageObj.roomId,
         userId: user?._id,
-        providerUid: user?.providerUid || user?._id,
         displayName: user?.displayName || "Unknown User",
         photoURL: user?.photoURL || "",
         createdAt: messageObj.createdAt,
@@ -339,9 +337,7 @@ exports.updateMessage = async (req, res) => {
 exports.deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params; // Lấy messageId từ URL
-    const { uid } = req.body; // Lấy uid từ request body
-
-    console.log("🗑️ Delete message request:", { messageId, uid });
+    const { uid } = req.query; // Lấy uid từ request body
 
     // Tìm tin nhắn theo ID
     const message = await Message.findById(messageId);
@@ -353,60 +349,24 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    // Tìm user để so sánh ownership - kiểm tra cả _id và providerUid
-    let user = await User.findById(uid);
+    // Tìm user để so sánh ownership
+    let user = await User.findOne({ uid });
     if (!user) {
-      user = await User.findOne({ providerUid: uid });
-    }
-    if (!user) {
-      user = await User.findOne({ uid });
+      user = await User.findById(uid);
     }
 
-    if (!user) {
-      console.error("❌ User not found:", uid);
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy người dùng",
-      });
-    }
-
-    console.log("👤 User found:", { 
-      userId: user._id, 
-      providerUid: user.providerUid,
-      uid: user.uid 
-    });
-    console.log("📝 Message userId:", message.userId);
-
-    // ✅ Kiểm tra ownership - so sánh cả _id và providerUid
-    const messageUserId = message.userId.toString();
-    const userMongoId = user._id.toString();
-    const userProviderId = user.providerUid || user.uid;
-    
-    const isOwner = 
-      messageUserId === userMongoId ||
-      (userProviderId && messageUserId === userProviderId);
-
-    if (!isOwner) {
-      console.error("❌ Ownership check failed:", {
-        messageUserId,
-        userMongoId,
-        userProviderId,
-      });
-
+    // Chỉ tác giả tin nhắn mới được xóa
+    if (message.userId.toString() !== user?._id?.toString()) {
       return res.status(403).json({
         success: false,
         message: "Chỉ tác giả tin nhắn mới có quyền xóa",
       });
     }
 
-    console.log("✅ Ownership verified, deleting message");
-
     const roomId = message.roomId.toString();
 
     // Xóa tin nhắn khỏi database
     await Message.findByIdAndDelete(messageId);
-
-    console.log("✅ Message deleted successfully from database");
 
     // ✅ Emit socket event để thông báo tin nhắn đã bị xóa
     const io = req.app.get("io");
@@ -415,7 +375,7 @@ exports.deleteMessage = async (req, res) => {
         messageId: messageId.toString(),
         roomId,
       });
-      console.log(`🔔 Message deleted event emitted for room: ${roomId}`);
+      console.log(`🗑️ Message deleted event emitted for message: ${messageId}`);
     }
 
     res.json({
@@ -423,7 +383,7 @@ exports.deleteMessage = async (req, res) => {
       message: "Xóa tin nhắn thành công",
     });
   } catch (error) {
-    console.error("❌ Lỗi khi xóa tin nhắn:", error);
+    console.error("Lỗi khi xóa tin nhắn:", error);
     res.status(500).json({
       success: false,
       error: error.message,
