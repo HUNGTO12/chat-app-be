@@ -359,7 +359,7 @@ exports.deleteMessage = async (req, res) => {
     }
 
     // Tìm user để so sánh ownership
-    let user = await User.findOne({ uid });
+    let user = await User.findOne({ providerUid: uid });
     if (!user) {
       user = await User.findById(uid);
     }
