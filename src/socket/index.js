@@ -7,7 +7,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
   const io = new Server(server, {
     cors: {
       origin: allowAll ? true : allowedOrigins,
-      methods: ["GET", "POST", "PUT", "DELETE"s],
+      methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true,
     },
     transports: ["polling", "websocket"],
