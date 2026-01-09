@@ -339,6 +339,15 @@ exports.deleteMessage = async (req, res) => {
     const { messageId } = req.params; // Lấy messageId từ URL
     const { uid } = req.query; // Lấy uid từ request body
 
+    console.log("🗑️ Delete request:", { messageId, uid });
+
+    if (!uid) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID là bắt buộc",
+      });
+    }
+
     // Tìm tin nhắn theo ID
     const message = await Message.findById(messageId);
 
