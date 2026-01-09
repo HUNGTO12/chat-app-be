@@ -7,10 +7,12 @@ const userSchema = new mongoose.Schema(
       type: String, // Tên đăng nhập của người dùng
       sparse: true, // Cho phép null nhưng vẫn unique nếu có
       unique: true, // Không được trùng lặp
+      index: true,
     },
     email: {
       type: String, // Email của người dùng
       unique: true, // Không được trùng lặp
+      index: true,
     },
     password: {
       type: String, // Mật khẩu của người dùng
@@ -47,6 +49,8 @@ const userSchema = new mongoose.Schema(
     timestamps: true, // Tự động thêm createdAt và updatedAt
   }
 );
-
+// Tạo index cho email và username để tăng hiệu suất truy vấn
+userSchema.index({ username: 1, email: 1 });
+userSchema.index({ providerUid: 1 });
 // Export model User
 module.exports = mongoose.model("User", userSchema);
