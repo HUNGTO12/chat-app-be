@@ -19,10 +19,18 @@ function setupSocketIO(server, app, allowedOrigins = []) {
   if (app && typeof app.set === "function") {
     app.set("io", io);
   }
+  // ✅ THÊM: Lưu mapping userId -> socketId
+  const userSocketMap = new Map(); // userId -> socketId
 
   io.on("connection", (socket) => {
     console.log(`✅ Socket connected: ${socket.id}`);
-
+    // ✅ LƯU userId KHI KẾT NỐI
+    const userId = socket.handshake.query?.userId;
+    if (userId) {
+      userSocketMap.set(userId, socket.id);
+      console.log(`💾 Saved mapping: ${userId} -> ${socket.id}`);
+      console.log(`📊 Total users online: ${userSocketMap.size}`);
+    }
     // ==================== CHAT EVENTS ====================
     socket.on("join-room", (roomId) => {
       if (!roomId) return;
@@ -42,13 +50,23 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     // 📞 Gửi lời mời video call
     socket.on("call-user", ({ userToCall, signalData, from, roomId }) => {
       console.log(`📞 [VIDEO CALL] Call from ${from} to ${userToCall}`);
-      console.log(`   Signal:`, signalData);
-      console.log(`   Room ID:`, roomId);
+
+      // ✅ TÌM SOCKET ID CỦA USER NHẬN
+      const recipientSocketId = userSocketMap.get(userToCall);
+
+      if (!recipientSocketId) {
+        console.error(`❌ User ${userToCall} not found or offline`);
+        console.log(`📊 Available users:`, Array.from(userSocketMap.keys()));
+        socket.emit("call-failed", {
+          message: "Người dùng không online hoặc không tìm thấy",
+        });
+        return;
+      }
 
       // Emit đến người nhận (sử dụng socket ID)
-      io.to(userToCall).emit("incoming-call", {
+      io.to(recipientSocketId).emit("incoming-call", {
         signal: signalData,
-        from,
+        from: socket.id,
         roomId,
         callerName: socket.handshake.query?.displayName || "Unknown",
         callerAvatar: socket.handshake.query?.photoURL || "",
