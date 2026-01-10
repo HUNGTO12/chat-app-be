@@ -202,3 +202,33 @@ exports.uploadAvatar = async (req, res) => {
     });
   }
 };
+
+// ✅ THÊM: Lấy Socket ID của user
+exports.getUserSocketId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userSocketMap = req.app.get("userSocketMap");
+
+    if (!userSocketMap) {
+      return res.status(500).json({
+        success: false,
+        message: "Socket service chưa được khởi tạo",
+      });
+    }
+
+    const socketId = userSocketMap.get(userId);
+
+    if (!socketId) {
+      return res.status(404).json({
+        success: false,
+        message: "Người dùng không online hoặc chưa kết nối socket",
+      });
+    }
+
+    console.log(`✅ Socket ID for user ${userId}: ${socketId}`);
+    res.json({ success: true, data: { socketId } });
+  } catch (error) {
+    console.error("❌ Lỗi lấy Socket ID:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

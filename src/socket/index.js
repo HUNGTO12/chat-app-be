@@ -72,11 +72,11 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         signal: signalData,
         from: socket.id,
         roomId,
-        callerName: socket.handshake.query?.displayName || "Unknown",
-        callerAvatar: socket.handshake.query?.photoURL || "",
+        callerName: displayName || "Unknown",
+        callerAvatar: photoURL || "",
       });
 
-      console.log(`✅ Sent incoming-call to ${userToCall}`);
+      console.log(`✅ Sent incoming-call to socket ${recipientSocketId} (userId: ${userToCall})`);
     });
 
     // ✅ Chấp nhận video call
