@@ -9,8 +9,9 @@ router.get("/", userController.getAllUsers);
 // GET /api/users/search?q=keyword
 router.get("/search", userController.searchUsers);
 
-// ✅ THÊM: GET /api/users/:userId/socket-id - Lấy Socket ID của user
-router.get("/:userId/socket-id", userController.getUserSocketId);
+// ✅ Route này phải ĐẶT TRƯỚC /:id để tránh conflict
+// GET /api/users/socket/:userId - Lấy Socket ID của user
+router.get("/socket/:userId", userController.getUserSocketId);
 
 // POST /api/users/upload-avatar - Upload ảnh đại diện
 router.post(
