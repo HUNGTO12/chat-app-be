@@ -76,7 +76,9 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         callerAvatar: photoURL || "",
       });
 
-      console.log(`✅ Sent incoming-call to socket ${recipientSocketId} (userId: ${userToCall})`);
+      console.log(
+        `✅ Sent incoming-call to socket ${recipientSocketId} (userId: ${userToCall})`
+      );
     });
 
     // ✅ Chấp nhận video call
