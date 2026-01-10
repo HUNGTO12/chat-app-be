@@ -22,11 +22,15 @@ function setupSocketIO(server, app, allowedOrigins = []) {
   // ✅ THÊM: Lưu mapping userId -> socketId
   const userSocketMap = new Map(); // userId -> socketId
 
+  app.set("userSocketMap", userSocketMap);
   io.on("connection", (socket) => {
     console.log(`✅ Socket connected: ${socket.id}`);
-    // ✅ LƯU userId KHI KẾT NỐI
-    const userId = socket.handshake.query?.userId;
-    if (userId) {
+
+    const { userId, displayName, photoURL } = socket.handshake.query;
+    console.log(`👤 User info:`, { userId, displayName });
+
+    // ✅ LƯU MAPPING userId -> socketId
+    if (userId && userId !== "undefined") {
       userSocketMap.set(userId, socket.id);
       console.log(`💾 Saved mapping: ${userId} -> ${socket.id}`);
       console.log(`📊 Total users online: ${userSocketMap.size}`);
@@ -100,11 +104,17 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     });
 
     // ==================== DISCONNECT ====================
-    socket.on("disconnect", (reason) => {
-      console.log(`❌ Socket disconnected: ${socket.id}, reason: ${reason}`);
+    socket.on("disconnect", () => {
+      console.log(`❌ Socket disconnected: ${socket.id}`);
+
+      // ✅ XÓA MAPPING KHI DISCONNECT
+      if (userId && userId !== "undefined") {
+        userSocketMap.delete(userId);
+        console.log(`🗑️ Removed mapping for user: ${userId}`);
+        console.log(`📊 Total users online: ${userSocketMap.size}`);
+      }
     });
   });
-
   return io;
 }
 
