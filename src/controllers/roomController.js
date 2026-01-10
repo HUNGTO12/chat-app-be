@@ -54,11 +54,18 @@ exports.getRooms = async (req, res) => {
       .sort({ updatedAt: -1 })
       .select("-__v");
 
+    console.log("📦 Rooms from DB:", rooms); // ✅ LOG ĐỂ DEBUG
+
     const roomsWithMembers = await Promise.all(
-      rooms.map(async (room) => ({
-        ...room.toObject(),
-        membersDetails: await getMembersDetails(room.members),
-      }))
+      rooms.map(async (room) => {
+        const roomObj = room.toObject();
+        return {
+          ...roomObj,
+          // ✅ Đảm bảo isPrivate luôn có giá trị (mặc định false)
+          isPrivate: roomObj.isPrivate ?? false,
+          membersDetails: await getMembersDetails(room.members),
+        };
+      })
     );
 
     res.json({
@@ -361,6 +368,78 @@ exports.deleteRoom = async (req, res) => {
     res.json({ success: true, message: "Xóa phòng thành công" });
   } catch (error) {
     console.error("Lỗi khi xóa phòng:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+// Lấy hoặc tạo phòng chat riêng giữa 2 users
+exports.getOrCreatePrivateRoom = async (req, res) => {
+  try {
+    const { userId1, userId2 } = req.body;
+
+    if (!userId1 || !userId2) {
+      return res.status(400).json({
+        success: false,
+        message: "Cần cung cấp userId1 và userId2",
+      });
+    }
+
+    if (userId1 === userId2) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể tạo chat riêng với chính mình",
+      });
+    }
+
+    // Tìm user 1 và user 2
+    const user1 = await findUser(userId1);
+    const user2 = await findUser(userId2);
+
+    if (!user1 || !user2) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    const members = [user1._id.toString(), user2._id.toString()];
+
+    // Tìm phòng chat riêng đã tồn tại (cả 2 chiều)
+    const existingRoom = await Room.findOne({
+      $and: [
+        { members: { $all: members } },
+        { members: { $size: 2 } },
+        { isPrivate: true },
+      ],
+    });
+
+    if (existingRoom) {
+      const membersDetails = await getMembersDetails(existingRoom.members);
+      return res.json({
+        success: true,
+        data: { ...existingRoom.toObject(), membersDetails },
+        message: "Đã tìm thấy phòng chat riêng",
+      });
+    }
+
+    // Tạo phòng mới nếu chưa có
+    const room = new Room({
+      name: `Chat riêng: ${user1.displayName} & ${user2.displayName}`,
+      description: "Phòng chat riêng",
+      members,
+      createdBy: user1._id.toString(),
+      isPrivate: true, // Đánh dấu là chat riêng
+    });
+
+    await room.save();
+    const membersDetails = await getMembersDetails(room.members);
+
+    res.status(201).json({
+      success: true,
+      data: { ...room.toObject(), membersDetails },
+      message: "Tạo phòng chat riêng thành công",
+    });
+  } catch (error) {
+    console.error("Lỗi khi tạo/lấy phòng chat riêng:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };

@@ -214,9 +214,6 @@ exports.createMessage = async (req, res) => {
         roomId: message.roomId.toString(),
       };
 
-      console.log("📤 Emitting to room:", String(roomId));
-      console.log("📤 Message data:", JSON.stringify(messageData, null, 2));
-
       // Emit đến TẤT CẢ users trong room (bao gồm cả người gửi)
       io.to(String(roomId)).emit("receive-message", messageData);
 

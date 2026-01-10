@@ -28,5 +28,8 @@ router.delete("/:roomId", roomController.deleteRoom);
 // Rời khỏi phòng chat
 router.post("/:roomId/leave", roomController.leaveRoom);
 
+// POST /api/rooms/private - Lấy hoặc tạo phòng chat riêng
+router.post("/private", roomController.getOrCreatePrivateRoom);
+
 // Export router để sử dụng trong server.js
 module.exports = router;

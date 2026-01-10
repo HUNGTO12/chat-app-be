@@ -17,6 +17,10 @@ const roomSchema = new mongoose.Schema(
       type: String, // Thay đổi từ ObjectId thành String
       required: true,
     },
+    isPrivate: {
+      type: Boolean,
+      default: false, // Mặc định là phòng chat nhóm
+    },
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt
