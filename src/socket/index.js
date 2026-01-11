@@ -1,122 +1,162 @@
 const { Server } = require("socket.io");
 
 function setupSocketIO(server, app, allowedOrigins = []) {
-  const allowAll =
-    Array.isArray(allowedOrigins) && allowedOrigins.includes("*");
-
   const io = new Server(server, {
     cors: {
-      origin: allowAll ? true : allowedOrigins,
-      methods: ["GET", "POST", "PUT", "DELETE"],
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes("*")) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          console.warn(`⚠️ CORS blocked origin: ${origin}`);
+          callback(null, true);
+        }
+      },
+      methods: ["GET", "POST"],
       credentials: true,
     },
     transports: ["polling", "websocket"],
-    pingTimeout: 60000,
-    pingInterval: 25000,
   });
 
-  // QUAN TRỌNG: Gán io lên app để controller có thể lấy
-  if (app && typeof app.set === "function") {
-    app.set("io", io);
-  }
-  // ✅ THÊM: Lưu mapping userId -> socketId
   const userSocketMap = new Map(); // userId -> socketId
 
-  app.set("userSocketMap", userSocketMap);
   io.on("connection", (socket) => {
-    console.log(`✅ Socket connected: ${socket.id}`);
+    console.log("✅ User connected:", socket.id);
 
+    // ✅ LƯU userId vào socket instance để tránh bị ghi đè
     const { userId, displayName, photoURL } = socket.handshake.query;
-    console.log(`👤 User info:`, { userId, displayName });
+    socket.userId = userId;
+    socket.displayName = displayName;
+    socket.photoURL = photoURL;
 
-    // ✅ LƯU MAPPING userId -> socketId
-    if (userId && userId !== "undefined") {
+    if (userId && userId !== "undefined" && userId !== "") {
       userSocketMap.set(userId, socket.id);
-      console.log(`💾 Saved mapping: ${userId} -> ${socket.id}`);
-      console.log(`📊 Total users online: ${userSocketMap.size}`);
+      console.log(`📝 Mapped userId ${userId} to socketId ${socket.id}`);
+      console.log(`📊 Total connected users: ${userSocketMap.size}`);
+      console.log(`👥 All users:`, Array.from(userSocketMap.keys()));
+    } else {
+      console.warn(`⚠️ Socket ${socket.id} connected without valid userId`);
     }
-    // ==================== CHAT EVENTS ====================
+
+    // ==================== JOIN ROOM ====================
     socket.on("join-room", (roomId) => {
-      if (!roomId) return;
-      socket.join(String(roomId));
-      console.log(`📍 Socket ${socket.id} joined room ${roomId}`);
-      socket.emit("joined-room", { roomId, socketId: socket.id });
+      socket.join(roomId);
+      console.log(`📍 User ${socket.id} joined room: ${roomId}`);
+      socket.to(roomId).emit("joined-room", { socketId: socket.id, roomId });
     });
 
+    // ==================== LEAVE ROOM ====================
     socket.on("leave-room", (roomId) => {
-      if (!roomId) return;
-      socket.leave(String(roomId));
-      console.log(`👋 Socket ${socket.id} left room ${roomId}`);
+      socket.leave(roomId);
+      console.log(`📤 User ${socket.id} left room: ${roomId}`);
     });
 
     // ==================== VIDEO CALL EVENTS ====================
+    socket.on("call-user-agora", ({ userToCall, channelName, roomId }) => {
+      // ✅ SỬ DỤNG userId từ socket instance
+      console.log("\n🔔 ========== VIDEO CALL REQUEST ==========");
+      console.log(`📞 Caller User ID: ${socket.userId}`);
+      console.log(`📞 Caller Socket ID: ${socket.id}`);
+      console.log(`📞 Caller Name: ${socket.displayName}`);
+      console.log(`📞 Recipient User ID: ${userToCall}`);
+      console.log(`📞 Channel: ${channelName}`);
+      console.log(`📞 Room ID: ${roomId}`);
+      console.log(
+        `📊 Available users in map:`,
+        Array.from(userSocketMap.keys())
+      );
 
-    // 📞 Gửi lời mời video call
-    socket.on("call-user", ({ userToCall, signalData, from, roomId }) => {
-      console.log(`📞 [VIDEO CALL] Call from ${from} to ${userToCall}`);
-
-      // ✅ TÌM SOCKET ID CỦA USER NHẬN
+      // Tìm socket ID của user nhận
       const recipientSocketId = userSocketMap.get(userToCall);
 
       if (!recipientSocketId) {
         console.error(`❌ User ${userToCall} not found or offline`);
-        console.log(`📊 Available users:`, Array.from(userSocketMap.keys()));
+        console.log(
+          "🔍 UserSocketMap entries:",
+          Array.from(userSocketMap.entries())
+        );
+        console.log("==========================================\n");
         socket.emit("call-failed", {
           message: "Người dùng không online hoặc không tìm thấy",
         });
         return;
       }
 
-      // Emit đến người nhận (sử dụng socket ID)
-      io.to(recipientSocketId).emit("incoming-call", {
-        signal: signalData,
-        from: socket.id,
+      console.log(`✅ Found recipient socket: ${recipientSocketId}`);
+
+      // ✅ Gửi thông báo cuộc gọi với userId từ socket instance
+      const callData = {
+        from: socket.userId, // ✅ ĐÚNG - userId của socket hiện tại
+        channelName,
         roomId,
-        callerName: displayName || "Unknown",
-        callerAvatar: photoURL || "",
-      });
+        callerName: socket.displayName || "Unknown User",
+        callerAvatar: socket.photoURL || "",
+        callerId: socket.id, // ✅ THÊM callerId
+      };
+
+      // ✅ Emit đến specific socket
+      const targetSocket = io.sockets.sockets.get(recipientSocketId);
+      if (targetSocket) {
+        console.log(`🎯 Target socket found: ${targetSocket.id}`);
+        console.log(`🔌 Target socket connected: ${targetSocket.connected}`);
+        targetSocket.emit("incoming-agora-call", callData);
+        console.log(`✅ Direct emit to socket ${recipientSocketId} completed`);
+      } else {
+        console.error(
+          `❌ Target socket ${recipientSocketId} not found in io.sockets.sockets`
+        );
+      }
 
       console.log(
-        `✅ Sent incoming-call to socket ${recipientSocketId} (userId: ${userToCall})`
+        `📤 Emitted "incoming-agora-call" to socket ${recipientSocketId}`
       );
+      console.log(`📦 Call data:`, callData);
+      console.log("==========================================\n");
     });
 
-    // ✅ Chấp nhận video call
-    socket.on("accept-call", ({ signal, to }) => {
-      console.log(`✅ [VIDEO CALL] Call accepted from ${socket.id} to ${to}`);
-      io.to(to).emit("call-accepted", signal);
+    socket.on("accept-agora-call", ({ to, channelName }) => {
+      const recipientSocketId = userSocketMap.get(to);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("call-accepted", { channelName });
+        console.log(`✅ Call accepted, notified ${recipientSocketId}`);
+      }
     });
 
-    // ❌ Từ chối video call
-    socket.on("reject-call", ({ to }) => {
-      console.log(`❌ [VIDEO CALL] Call rejected by ${socket.id}`);
-      io.to(to).emit("call-rejected");
+    socket.on("reject-agora-call", ({ to }) => {
+      const recipientSocketId = userSocketMap.get(to);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("call-rejected");
+        console.log(`❌ Call rejected, notified ${recipientSocketId}`);
+      }
     });
 
-    // 📴 Kết thúc video call
-    socket.on("end-call", ({ to }) => {
-      console.log(`📴 [VIDEO CALL] Call ended by ${socket.id}`);
-      io.to(to).emit("call-ended");
-    });
-
-    // 🧊 Gửi ICE candidate
-    socket.on("ice-candidate", ({ candidate, to }) => {
-      console.log(`🧊 [VIDEO CALL] ICE candidate from ${socket.id} to ${to}`);
-      io.to(to).emit("ice-candidate", { candidate, from: socket.id });
+    socket.on("end-agora-call", ({ to }) => {
+      const recipientSocketId = userSocketMap.get(to);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("call-ended");
+        console.log(`🔴 Call ended, notified ${recipientSocketId}`);
+      }
     });
 
     // ==================== DISCONNECT ====================
     socket.on("disconnect", () => {
-      console.log(`❌ Socket disconnected: ${socket.id}`);
+      console.log("❌ User disconnected:", socket.id);
 
-      // ✅ XÓA MAPPING KHI DISCONNECT
-      if (userId && userId !== "undefined") {
-        userSocketMap.delete(userId);
-        console.log(`🗑️ Removed mapping for user: ${userId}`);
-        console.log(`📊 Total users online: ${userSocketMap.size}`);
+      // ✅ XÓA userId từ socket instance
+      if (
+        socket.userId &&
+        socket.userId !== "undefined" &&
+        socket.userId !== ""
+      ) {
+        userSocketMap.delete(socket.userId);
+        console.log(`🗑️ Removed userId ${socket.userId} from map`);
+        console.log(`📊 Remaining users: ${userSocketMap.size}`);
       }
     });
   });
+
+  app.set("io", io);
   return io;
 }
 
