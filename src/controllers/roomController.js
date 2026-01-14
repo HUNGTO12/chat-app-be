@@ -16,7 +16,8 @@ const findUser = async (identifier) => {
 
 const getUserDetails = (user) => ({
   _id: user._id,
-  uid: user.uid,
+  uid: user.providerUid || user._id.toString(), // ✅ Ưu tiên providerUid cho video call
+  providerUid: user.providerUid || user._id.toString(), // ✅ Thêm providerUid
   username: user.username,
   email: user.email,
   displayName: user.displayName,
@@ -53,8 +54,6 @@ exports.getRooms = async (req, res) => {
     const rooms = await Room.find({ members: { $in: userIdentifiers } })
       .sort({ updatedAt: -1 })
       .select("-__v");
-
-    console.log("📦 Rooms from DB:", rooms); // ✅ LOG ĐỂ DEBUG
 
     const roomsWithMembers = await Promise.all(
       rooms.map(async (room) => {

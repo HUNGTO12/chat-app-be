@@ -63,7 +63,10 @@ exports.loginWithFacebook = async (req, res) => {
       const token = jwt.sign(
         {
           userId: user._id,
+          uid: user.providerUid || user._id.toString(), // ✅ Thêm uid cho socket & video call
           providerUid: user.providerUid,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
         },
         process.env.JWT_SECRET || "your-secret-key",
         { expiresIn: "7d" }
@@ -133,7 +136,11 @@ exports.login = async (req, res) => {
     const accessToken = jwt.sign(
       {
         userId: user._id,
+        uid: user.providerUid || user._id.toString(), // ✅ Thêm uid cho socket & video call
+        providerUid: user.providerUid || user._id.toString(), // ✅ Đồng bộ với Facebook login
         username: user.username,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
       },
       process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: "1d" }
@@ -143,6 +150,7 @@ exports.login = async (req, res) => {
     const refreshToken = jwt.sign(
       {
         userId: user._id,
+        uid: user.providerUid || user._id.toString(), // ✅ Thêm uid
         username: user.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
