@@ -113,6 +113,31 @@ exports.getRoomById = async (req, res) => {
   }
 };
 
+// Lấy danh sách members của phòng
+exports.getRoomMembers = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const room = await Room.findById(roomId).select("members");
+
+    if (!room) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy phòng chat" });
+    }
+
+    const membersDetails = await getMembersDetails(room.members);
+
+    res.json({
+      success: true,
+      data: membersDetails,
+      count: membersDetails.length,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách members:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Tạo phòng chat mới
 exports.createRoom = async (req, res) => {
   try {
