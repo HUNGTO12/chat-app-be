@@ -29,7 +29,7 @@ const getMembersDetails = async (members) => {
     members.map(async (id) => {
       const user = await findUser(id);
       return user ? getUserDetails(user) : null;
-    })
+    }),
   );
   return details.filter(Boolean);
 };
@@ -64,7 +64,7 @@ exports.getRooms = async (req, res) => {
           isPrivate: roomObj.isPrivate ?? false,
           membersDetails: await getMembersDetails(room.members),
         };
-      })
+      }),
     );
 
     res.json({
@@ -238,7 +238,7 @@ exports.joinRoom = async (req, res) => {
 
       console.log(
         `🔔 Emitting room-invitation to user ${userIdString}:`,
-        roomData
+        roomData,
       );
       io.emit("room-invitation", {
         userId: userIdString,

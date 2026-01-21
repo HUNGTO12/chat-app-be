@@ -27,7 +27,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       ([userId, socketId]) => ({
         userId,
         socketId,
-      })
+      }),
     );
     res.json({
       success: true,
@@ -52,6 +52,16 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     socket.photoURL = photoURL || "";
 
     if (userId && userId !== "undefined" && userId !== "") {
+      const oldSocketId = userSocketMap.get(userId);
+      if (oldSocketId && oldSocketId !== socket.id) {
+        const oldSocket = io.sockets.sockets.get(oldSocketId);
+        if (oldSocket) {
+          oldSocket.disconnect(true);
+          console.log(
+            `🔄 Disconnected old socket ${oldSocketId} for user ${userId}`,
+          );
+        }
+      }
       userSocketMap.set(userId, socket.id);
     } else {
       console.warn(`⚠️ Socket ${socket.id} connected without valid userId`);
@@ -71,11 +81,16 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     });
 
     // ==================== VIDEO CALL EVENTS ====================
-    socket.on("call-user-agora", ({ userToCall, channelName, roomId }) => {
+    socket.on("initiate-agora-call", ({ to, channelName, roomId }) => {
       // Tìm socket ID của user nhận
-      const recipientSocketId = userSocketMap.get(userToCall);
+      const recipientSocketId = userSocketMap.get(to);
 
       if (!recipientSocketId) {
+        console.error(`❌ User ${to} not found in userSocketMap`);
+        console.log(
+          "📋 Current userSocketMap:",
+          Array.from(userSocketMap.entries()),
+        );
         socket.emit("call-failed", {
           message: "Người dùng không online hoặc không tìm thấy",
         });
@@ -86,22 +101,35 @@ function setupSocketIO(server, app, allowedOrigins = []) {
 
       // ✅ Gửi thông báo cuộc gọi với userId từ socket instance
       const callData = {
-        from: socket.userId, // ✅ ĐÚNG - userId của socket hiện tại
+        from: socket.userId,
         channelName,
         roomId,
-        callerName: socket.displayName || "Error Unknown User",
+        callerName: socket.displayName || "Unknown User",
         callerAvatar: socket.photoURL || "",
-        callerId: socket.id, // ✅ THÊM callerId
+        callerId: socket.id,
       };
+
+      console.log("📦 Call data to send:", JSON.stringify(callData, null, 2));
 
       // ✅ Emit đến specific socket
       const targetSocket = io.sockets.sockets.get(recipientSocketId);
       if (targetSocket) {
         targetSocket.emit("incoming-agora-call", callData);
+        console.log(
+          `✅✅✅ Successfully emitted incoming-agora-call to socket ${recipientSocketId}`,
+        );
+        console.log(`📤 Recipient User ID: ${targetSocket.userId}`);
       } else {
         console.error(
-          `❌ Target socket ${recipientSocketId} not found in io.sockets.sockets`
+          `❌ Target socket ${recipientSocketId} not found in io.sockets.sockets`,
         );
+        console.log(
+          "📋 Available sockets:",
+          Array.from(io.sockets.sockets.keys()),
+        );
+        socket.emit("call-failed", {
+          message: "Không thể kết nối đến người nhận",
+        });
       }
     });
 
@@ -133,13 +161,13 @@ function setupSocketIO(server, app, allowedOrigins = []) {
     socket.on("disconnect", () => {
       console.log("❌ User disconnected:", socket.id);
 
-      // ✅ XÓA userId từ socket instance
-      if (
-        socket.userId &&
-        socket.userId !== "undefined" &&
-        socket.userId !== ""
-      ) {
+      if (socket.userId && userSocketMap.get(socket.userId) === socket.id) {
         userSocketMap.delete(socket.userId);
+        console.log(`🗑️ Removed user ${socket.userId} from map`);
+      } else {
+        console.log(
+          `⚠️ Skip removing user ${socket.userId}, socketId mismatch`,
+        );
       }
     });
   });
