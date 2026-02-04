@@ -27,7 +27,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       ([userId, socketId]) => ({
         userId,
         socketId,
-      }),
+      })
     );
     res.json({
       success: true,
@@ -58,7 +58,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         if (oldSocket) {
           oldSocket.disconnect(true);
           console.log(
-            `🔄 Disconnected old socket ${oldSocketId} for user ${userId}`,
+            `🔄 Disconnected old socket ${oldSocketId} for user ${userId}`
           );
         }
       }
@@ -89,7 +89,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         console.error(`❌ User ${to} not found in userSocketMap`);
         console.log(
           "📋 Current userSocketMap:",
-          Array.from(userSocketMap.entries()),
+          Array.from(userSocketMap.entries())
         );
         socket.emit("call-failed", {
           message: "Người dùng không online hoặc không tìm thấy",
@@ -116,16 +116,16 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       if (targetSocket) {
         targetSocket.emit("incoming-agora-call", callData);
         console.log(
-          `✅✅✅ Successfully emitted incoming-agora-call to socket ${recipientSocketId}`,
+          `✅✅✅ Successfully emitted incoming-agora-call to socket ${recipientSocketId}`
         );
         console.log(`📤 Recipient User ID: ${targetSocket.userId}`);
       } else {
         console.error(
-          `❌ Target socket ${recipientSocketId} not found in io.sockets.sockets`,
+          `❌ Target socket ${recipientSocketId} not found in io.sockets.sockets`
         );
         console.log(
           "📋 Available sockets:",
-          Array.from(io.sockets.sockets.keys()),
+          Array.from(io.sockets.sockets.keys())
         );
         socket.emit("call-failed", {
           message: "Không thể kết nối đến người nhận",
@@ -166,7 +166,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         console.log(`🗑️ Removed user ${socket.userId} from map`);
       } else {
         console.log(
-          `⚠️ Skip removing user ${socket.userId}, socketId mismatch`,
+          `⚠️ Skip removing user ${socket.userId}, socketId mismatch`
         );
       }
     });
