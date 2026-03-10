@@ -24,7 +24,7 @@ const friendSchema = new mongoose.Schema(
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt
-  }
+  },
 );
 
 // Index để tránh trùng lặp quan hệ bạn bè

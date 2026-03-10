@@ -18,7 +18,7 @@ exports.searchUsers = async (req, res) => {
       {
         $or: [{ email: regex }, { username: regex }, { displayName: regex }],
       },
-      "uid email username displayName photoURL"
+      "uid email username displayName photoURL",
     )
       .limit(20)
       .sort({ updatedAt: -1 });
@@ -35,7 +35,7 @@ exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find(
       {},
-      "_id uid email username displayName photoURL"
+      "_id uid email username displayName photoURL",
     )
       .limit(100)
       .sort({ updatedAt: -1 });
@@ -139,7 +139,7 @@ exports.uploadAvatar = async (req, res) => {
     // Tạo upload stream
     const uploadStream = cloudinary.uploader.upload_stream(
       uploadOptions,
-      handleUploadComplete
+      handleUploadComplete,
     );
 
     // Chuyển buffer thành stream và upload
@@ -182,6 +182,97 @@ exports.getUserSocketId = async (req, res) => {
     res.json({ success: true, data: { socketId } });
   } catch (error) {
     console.error("❌ Lỗi lấy Socket ID:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ THÊM: Lấy danh sách tất cả users đang online
+exports.getOnlineUsers = async (req, res) => {
+  try {
+    const onlineUsers = await User.find(
+      { isOnline: true },
+      "_id displayName photoURL isOnline lastSeen",
+    ).sort({ lastSeen: -1 });
+
+    res.json({
+      success: true,
+      count: onlineUsers.length,
+      data: onlineUsers,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi lấy online users:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ THÊM: Lấy status của 1 user cụ thể
+exports.getUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(
+      userId,
+      "_id displayName photoURL isOnline lastSeen",
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User không tồn tại",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        userId: user._id,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Lỗi lấy user status:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ THÊM: Batch check status cho nhiều users cùng lúc
+exports.getBatchUserStatus = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "userIds phải là array và không được rỗng",
+      });
+    }
+
+    const users = await User.find(
+      { _id: { $in: userIds } },
+      "_id displayName photoURL isOnline lastSeen",
+    );
+
+    // Convert to map for easy lookup
+    const statusMap = {};
+    users.forEach((user) => {
+      statusMap[user._id.toString()] = {
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen,
+      };
+    });
+
+    res.json({
+      success: true,
+      count: users.length,
+      data: statusMap,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi batch check user status:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

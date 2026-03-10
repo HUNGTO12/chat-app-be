@@ -13,14 +13,23 @@ router.get("/search", userController.searchUsers);
 // GET /api/users/socket/:userId - Lấy Socket ID của user
 router.get("/socket/:userId", userController.getUserSocketId);
 
+// ✅ GET /api/users/online - Lấy danh sách users đang online
+router.get("/online", userController.getOnlineUsers);
+
+// ✅ POST /api/users/batch-status - Batch check status nhiều users
+router.post("/batch-status", userController.getBatchUserStatus);
+
 // POST /api/users/upload-avatar - Upload ảnh đại diện
 router.post(
   "/upload-avatar",
   upload.single("avatar"),
-  userController.uploadAvatar
+  userController.uploadAvatar,
 );
 
 // Cập nhật người dùng
 router.put("/:id", userController.updateUser);
+
+// ✅ GET /api/users/:userId/status - Lấy status của 1 user cụ thể
+router.get("/:userId/status", userController.getUserStatus);
 
 module.exports = router;

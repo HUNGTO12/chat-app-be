@@ -18,7 +18,7 @@ exports.loginWithFacebook = async (req, res) => {
     // Xác minh access token với Facebook API
     try {
       const fbResponse = await axios.get(
-        `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture`
+        `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture`,
       );
 
       const fbUser = fbResponse.data;
@@ -69,7 +69,7 @@ exports.loginWithFacebook = async (req, res) => {
           photoURL: user.photoURL,
         },
         process.env.JWT_SECRET || "your-secret-key",
-        { expiresIn: "7d" }
+        { expiresIn: "7d" },
       );
 
       res.json({
@@ -86,7 +86,7 @@ exports.loginWithFacebook = async (req, res) => {
     } catch (fbError) {
       console.error(
         "Facebook API Error:",
-        fbError.response?.data || fbError.message
+        fbError.response?.data || fbError.message,
       );
       return res.status(401).json({
         success: false,
@@ -143,7 +143,7 @@ exports.login = async (req, res) => {
         photoURL: user.photoURL,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     // Tạo refresh token (7 ngày)
@@ -154,7 +154,7 @@ exports.login = async (req, res) => {
         username: user.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     // Cập nhật refresh token và access token vào user
@@ -268,7 +268,7 @@ exports.register = async (req, res) => {
         username: newUser.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     res.status(201).json({
@@ -320,7 +320,7 @@ exports.refreshToken = async (req, res) => {
         username: user.username,
       },
       process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
 
     res.status(200).json({
@@ -358,7 +358,7 @@ exports.logout = async (req, res) => {
     // Xóa refresh token khỏi database
     if (Array.isArray(user.refreshToken)) {
       user.refreshToken = user.refreshToken.filter(
-        (token) => token !== refreshToken
+        (token) => token !== refreshToken,
       );
     } else {
       user.refreshToken = null;

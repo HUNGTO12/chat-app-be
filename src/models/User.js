@@ -44,10 +44,24 @@ const userSchema = new mongoose.Schema(
         type: String,
       },
     ], // Lưu refresh tokens
+    isOnline: {
+      type: Boolean,
+      default: false,
+      index: true, // Index để query nhanh
+    }, // Trạng thái online/offline
+    lastSeen: {
+      type: Date,
+      default: null,
+    }, // Thời gian lần cuối online
+    socketIds: [
+      {
+        type: String,
+      },
+    ], // Danh sách socket IDs (hỗ trợ multi-device)
   },
   {
     timestamps: true, // Tự động thêm createdAt và updatedAt
-  }
+  },
 );
 // Tạo index cho email và username để tăng hiệu suất truy vấn
 userSchema.index({ username: 1, email: 1 });
