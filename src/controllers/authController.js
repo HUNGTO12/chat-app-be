@@ -162,10 +162,10 @@ exports.login = async (req, res) => {
     user.accessToken = accessToken;
     await user.save();
 
-    console.log("Login successfully");
     res.status(200).json({
       accessToken,
       refreshToken,
+      message: "Đăng nhập thành công",
     });
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
@@ -364,7 +364,23 @@ exports.logout = async (req, res) => {
       user.refreshToken = null;
     }
 
+    // Đồng bộ presence khi logout để tránh kẹt trạng thái online
+    user.isOnline = false;
+    user.lastSeen = new Date();
+    user.socketIds = [];
+
     await user.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("user:offline", {
+        userId: user._id.toString(),
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        isOnline: false,
+        lastSeen: user.lastSeen,
+      });
+    }
 
     res.status(200).json({
       success: true,

@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const { isValidObjectId } = require("mongoose");
 const User = require("../models/User");
 
 function setupSocketIO(server, app, allowedOrigins = []) {
@@ -37,47 +38,54 @@ function setupSocketIO(server, app, allowedOrigins = []) {
       users,
     });
   });
-
+  // Hàm xử lý kết nối Socket.IO
   io.on("connection", (socket) => {
     console.log("✅ User connected:", socket.id);
 
-    // ✅ LƯU userId vào socket instance để tránh bị ghi đè
+    // Lấy thông tin userId, displayName, photoURL từ query parameters
     const { userId, displayName, photoURL } = socket.handshake.query;
+
+    const normalizedUserId = Array.isArray(userId) ? userId[0] : userId;
     // ✅ LOG để debug
     console.log("📝 Socket connection with user info:", {
-      userId,
+      userId: normalizedUserId,
       displayName,
       photoURL,
     });
-    socket.userId = userId;
+    socket.userId = normalizedUserId;
     socket.displayName = displayName || "Unknown User";
     socket.photoURL = photoURL || "";
 
-    if (userId && userId !== "undefined" && userId !== "") {
+    if (
+      normalizedUserId &&
+      normalizedUserId !== "undefined" &&
+      normalizedUserId !== "" &&
+      isValidObjectId(normalizedUserId)
+    ) {
       // ✅ Cancel any pending disconnect timer for this user
-      if (disconnectTimers.has(userId)) {
-        clearTimeout(disconnectTimers.get(userId));
-        disconnectTimers.delete(userId);
-        console.log(`⏱️ Cleared disconnect timer for user ${userId}`);
+      if (disconnectTimers.has(normalizedUserId)) {
+        clearTimeout(disconnectTimers.get(normalizedUserId));
+        disconnectTimers.delete(normalizedUserId);
+        console.log(`⏱️ Cleared disconnect timer for user ${normalizedUserId}`);
       }
 
-      const oldSocketId = userSocketMap.get(userId);
+      const oldSocketId = userSocketMap.get(normalizedUserId);
       if (oldSocketId && oldSocketId !== socket.id) {
         const oldSocket = io.sockets.sockets.get(oldSocketId);
         if (oldSocket) {
           oldSocket.disconnect(true);
           console.log(
-            `🔄 Disconnected old socket ${oldSocketId} for user ${userId}`,
+            `🔄 Disconnected old socket ${oldSocketId} for user ${normalizedUserId}`,
           );
         }
       }
-      userSocketMap.set(userId, socket.id);
+      userSocketMap.set(normalizedUserId, socket.id);
 
       // ✅ Update database: set user online và thêm socketId (ASYNC/AWAIT)
       (async () => {
         try {
           const user = await User.findByIdAndUpdate(
-            userId,
+            normalizedUserId,
             {
               isOnline: true,
               $addToSet: { socketIds: socket.id },
@@ -97,7 +105,7 @@ function setupSocketIO(server, app, allowedOrigins = []) {
               isOnline: true,
             });
             console.log(
-              `📢 Broadcasted user:online for ${userId} (isOnline: ${user.isOnline})`,
+              `📢 Broadcasted user:online for ${normalizedUserId} (isOnline: ${user.isOnline})`,
             );
           }
         } catch (err) {
@@ -105,7 +113,9 @@ function setupSocketIO(server, app, allowedOrigins = []) {
         }
       })();
     } else {
-      console.warn(`⚠️ Socket ${socket.id} connected without valid userId`);
+      console.warn(
+        `⚠️ Socket ${socket.id} connected without valid Mongo userId: ${normalizedUserId}`,
+      );
     }
 
     // ==================== JOIN ROOM ====================
